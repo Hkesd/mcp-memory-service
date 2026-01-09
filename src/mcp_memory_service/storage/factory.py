@@ -67,6 +67,13 @@ def get_storage_backend_class() -> Type[MemoryStorage]:
         except ImportError as e:
             logger.error(f"Failed to import Hybrid storage: {e}")
             return _fallback_to_sqlite_vec()
+    elif backend in ["chromadb", "dashvector", "hybrid_plus"]:
+        try:
+            from .plus_extension import get_plus_backend_class
+            return get_plus_backend_class(backend)
+        except ImportError as e:
+            logger.error(f"Failed to import plus extension backend '{backend}': {e}")
+            return _fallback_to_sqlite_vec()
     else:
         logger.warning(f"Unknown storage backend '{backend}', defaulting to SQLite-vec")
         from .sqlite_vec import SqliteVecMemoryStorage
@@ -161,6 +168,11 @@ async def create_storage_instance(sqlite_path: str, server_type: str = None) -> 
             batch_size=HYBRID_BATCH_SIZE
         )
         logger.info(f"Initialized hybrid storage with SQLite at {sqlite_path}")
+
+    elif StorageClass.__name__ in ["ChromaDBBackend", "DashVectorBackend", "HybridPlusBackend"]:
+        from .plus_extension import create_plus_instance
+        storage = await create_plus_instance(StorageClass, sqlite_path)
+        logger.info(f"Initialized {StorageClass.__name__}")
 
     else:
         # Unknown storage backend - this should not happen as get_storage_backend_class
